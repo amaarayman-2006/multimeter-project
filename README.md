@@ -7,7 +7,7 @@ A comprehensive digital multimeter built using Arduino Uno that measures voltage
 ## 📋 Features
 
 - **Voltage Measurement (DC)**: 0-100V with 0.01V resolution
-- **Current Measurement**: 0-220mA and 0-5A ranges
+- **Current Measurement**: 0-220mA
 - **Resistance Measurement**: 10Ω-1MΩ with auto-ranging
 - **16x2 LCD Display**: Real-time readings with backlight
 
@@ -24,4 +24,4 @@ A comprehensive digital multimeter built using Arduino Uno that measures voltage
 | Breadboard + wires | Standard 830-tie breadboard | 1 |
 | Power supply | USB (5V) or 7–12V DC barrel jack | 1 |
 
-## 🔌 Circuit Diagram
+See the images for better understanding of the project.
