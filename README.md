@@ -1,4 +1,4 @@
-# Arduino Digital Multimeter
+# Arduino-Based DC Digital Multimeter
 
 ![Arduino Multimeter](https://img.shields.io/badge/Arduino-Uno-blue.svg) ![License](https://img.shields.io/badge/license-MIT-green.svg) ![Version](https://img.shields.io/badge/version-1.0-red.svg)
 
