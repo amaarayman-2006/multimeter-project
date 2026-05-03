@@ -1,173 +1,195 @@
 #include <LiquidCrystal_I2C.h>
-#include <SoftwareSerial.h>
 
-#define VOLT_IN A0
-#define OHM A2
-#define VOLT_DETECT 2
+#define VOLT_IN       A0
+#define OHM           A2
+#define VOLT_DETECT   2
 #define CURRENT_DETECT 4
-#define OHM_DETECT 7
-#define CURRENT_IN A1
-#define POWER_DETECT 5
-#define RX 9
-#define TX 8
+#define OHM_DETECT    7
+#define CURRENT_IN    A3
+#define POWER_DETECT  5
 
-int v_on = 0, v_on1 = 0;
-int c_on = 0, c_on1 = 0;
-int o_on = 0, o_on1 = 0;
-int p_on = 0, p_on1 = 0;
-float volt = 0;
-float Iamp = 0;
-float r = 0;
-float Vr = 0;
-float avg = 0;
-float power = 0;
+// --- Calibration / scaling constants ---
+const float VOLT_SCALE  = 20.0;   // 95K + 5K divider
+const float VOLT_OFFSET = 0.2;    // Zero offset (calibrate with input shorted)
+const float SHUNT_OHM   = 22.0;   // Current shunt
+const float OHM_REF     = 10.0;   // 10K reference resistor (Kohms)
 
-String msgBuffer = "";
-String masseg = "";
-SoftwareSerial BTSerial(RX, TX);
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 
 void setup() {
   lcd.init();
   lcd.backlight();
-  BTSerial.begin(9600);
 
-  pinMode(VOLT_IN, INPUT);
-  pinMode(VOLT_DETECT, INPUT);
-  pinMode(CURRENT_IN, INPUT);
+  pinMode(VOLT_DETECT,   INPUT);
   pinMode(CURRENT_DETECT, INPUT);
-  pinMode(OHM, INPUT);
-  pinMode(OHM_DETECT, INPUT);
-  pinMode(POWER_DETECT, INPUT);
+  pinMode(OHM_DETECT,    INPUT);
+  pinMode(POWER_DETECT,  INPUT);
 }
 
-void usingApp() {
-  while (BTSerial.available() > 0) {
-    char data = (char) BTSerial.read();
-    msgBuffer += data;
-    if (data == ';') {
-      masseg = msgBuffer;
-      msgBuffer = "";
-    }
-    p_on1 = (masseg == "p;" || p_on == HIGH) && v_on != HIGH && c_on != HIGH && o_on != HIGH ? HIGH : LOW;
-    v_on1 = (masseg == "v;" || v_on == HIGH) && p_on != HIGH && c_on != HIGH && o_on != HIGH ? HIGH : LOW;
-    c_on1 = (masseg == "c;" || c_on == HIGH) && v_on != HIGH && p_on != HIGH && o_on != HIGH ? HIGH : LOW;
-    o_on1 = (masseg == "o;" || o_on == HIGH) && v_on != HIGH && c_on != HIGH && p_on != HIGH ? HIGH : LOW;
+/**
+ * Read an analog pin and return the averaged ADC value (0-1023).
+ * 'samples' should be a power of 2 if you later want to use bit-shifts.
+ */
+float readAverageADC(uint8_t pin, uint16_t samples) {
+  // Dummy read: let the ADC S/H capacitor settle after a channel switch
+  analogRead(pin);
+  delayMicroseconds(150);
+
+  uint32_t sum = 0;
+  for (uint16_t i = 0; i < samples; i++) {
+    sum += analogRead(pin);
   }
+  return sum / (float)samples;
 }
 
 void loop() {
-  p_on = digitalRead(POWER_DETECT);
-  v_on = digitalRead(VOLT_DETECT);
-  c_on = digitalRead(CURRENT_DETECT);
-  o_on = digitalRead(OHM_DETECT);
+  int p_on = digitalRead(POWER_DETECT);
+  int v_on = digitalRead(VOLT_DETECT);
+  int c_on = digitalRead(CURRENT_DETECT);
+  int o_on = digitalRead(OHM_DETECT);
 
-  usingApp();
-
-  for (int i = 0; i < 100; i++) {
-    volt = (analogRead(VOLT_IN)) * (5.0 / 1023);
-    volt = (volt * (100 / 5) - 0.2);
-    if (i != 0) {
-      volt = volt + avg;
-    }
-    avg = volt;
+  if (v_on == HIGH && c_on == LOW && o_on == LOW && p_on == LOW) {
+    runVoltmeter();
   }
-  volt = volt / 100;
-  avg = 0;
-
-  float Vacross = (analogRead(CURRENT_IN)) * (5.0 / 1023);
-  Iamp = ((Vacross) / 22);
-
-  for (int i = 0; i < 300; i++) {
-    Vr = (analogRead(OHM)) * (5.0 / 1023);
-    r = ((2 * Vr) / (1 - (Vr / 5)));
-    delay(3);
-    if (i != 0) {
-      r = r + avg;
-    }
-    avg = r;
+  else if (v_on == LOW && c_on == HIGH && o_on == LOW && p_on == LOW) {
+    runAmmeter();
   }
-  r = r / 300;
-
-  if ((v_on == HIGH || v_on1 == HIGH) && (c_on == LOW) && (o_on == LOW) && (p_on == LOW)) {
-    lcd.print("Voltmeter");
-    lcd.setCursor(0, 1);
-    lcd.print("Volt =");
-    lcd.setCursor(11, 1);
-    lcd.print("V");
-    lcd.setCursor(6, 1);
-    lcd.print(volt);
-    delay(1000);
-    volt = 0;
-    lcd.clear();
+  else if (v_on == LOW && c_on == LOW && o_on == HIGH && p_on == LOW) {
+    runOhmmeter();
   }
-  else if ((v_on == LOW) && (c_on == HIGH || c_on1 == HIGH) && (o_on == LOW) && (p_on == LOW)) {
-    lcd.print("Ammeter");
-    lcd.setCursor(0, 1);
-    lcd.print("Current= ");
-    if (floor(Iamp)) {
-      lcd.setCursor(8, 1);
-      lcd.print(Iamp - 0.44);
-      lcd.setCursor(14, 1);
-      lcd.print("A");
-    }
-    else {
-      Iamp = Iamp * 1000;
-      lcd.setCursor(8, 1);
-      lcd.print(Iamp - 0.44);
-      lcd.setCursor(14, 1);
-      lcd.print("mA");
-    }
-    delay(1000);
-    Iamp = 0;
-    lcd.clear();
-  }
-  else if ((v_on == LOW) && (c_on == LOW) && (o_on == HIGH || o_on1 == HIGH) && (p_on == LOW)) {
-    lcd.print("Ohmmeter");
-    lcd.setCursor(0, 1);
-    lcd.print("R =");
-    if (floor(r)) {
-      lcd.setCursor(3, 1);
-      lcd.print(r);
-      lcd.setCursor(12, 1);
-      lcd.print("Kohm");
-    }
-    else {
-      r = r * 1000;
-      lcd.setCursor(3, 1);
-      lcd.print(r);
-      lcd.setCursor(12, 1);
-      lcd.print("ohm");
-    }
-    delay(1000);
-    r = 0;
-    lcd.clear();
-  }
-  else if ((v_on == LOW) && (c_on == LOW) && (o_on == LOW) && (p_on == HIGH || p_on1 == HIGH)) {
-    power = volt * Iamp;
-    lcd.print("Wattmeter");
-    lcd.setCursor(0, 1);
-    lcd.print("Power= ");
-    if (floor(power)) {
-      lcd.setCursor(7, 1);
-      lcd.print(power);
-      lcd.setCursor(12, 1);
-      lcd.print("Watt");
-    }
-    else {
-      power = power * 100;
-      lcd.setCursor(7, 1);
-      lcd.print(power);
-      lcd.setCursor(12, 1);
-      lcd.print("mw");
-    }
-    delay(1000);
-    lcd.clear();
-    power = 0;
+  else if (v_on == LOW && c_on == LOW && o_on == LOW && p_on == HIGH) {
+    runWattmeter();
   }
   else {
-    lcd.print("Choose mode");
-    delay(2000);
+    lcd.setCursor(0, 0);
+    lcd.print("Choose mode     ");
+    lcd.setCursor(0, 1);
+    lcd.print("                ");
+    delay(500);
     lcd.clear();
   }
+}
+
+/* ------------------------------------------------------------------ */
+/*  VOLTMETER                                                          */
+/* ------------------------------------------------------------------ */
+void runVoltmeter() {
+  // 500 samples ~ 50 ms. That spans ~2.5 cycles of 50 Hz mains hum,
+  // which naturally averages out power-supply ripple.
+  float avgADC = readAverageADC(VOLT_IN, 500);
+  float pinV   = avgADC * (5.0 / 1023.0);
+  float volt   = pinV * VOLT_SCALE - VOLT_OFFSET;
+  if (volt < 0.0) volt = 0.0;
+
+  lcd.setCursor(0, 0);
+  lcd.print("Voltmeter       ");
+  lcd.setCursor(0, 1);
+
+  if (volt >= 1.0) {
+    lcd.print("V = ");
+    lcd.print(volt, 2);
+    lcd.print(" V   ");
+  } else {
+    lcd.print("V = ");
+    lcd.print(volt * 1000.0, 1);
+    lcd.print(" mV  ");
+  }
+
+  delay(400);
+  lcd.clear();
+}
+
+/* ------------------------------------------------------------------ */
+/*  AMMETER                                                            */
+/* ------------------------------------------------------------------ */
+void runAmmeter() {
+  float avgADC = readAverageADC(CURRENT_IN, 500);
+  float pinV   = avgADC * (5.0 / 1023.0);
+  float Iamp   = pinV / SHUNT_OHM;
+  if (Iamp < 0.0) Iamp = 0.0;
+
+  lcd.setCursor(0, 0);
+  lcd.print("Ammeter         ");
+  lcd.setCursor(0, 1);
+
+  if (Iamp >= 1.0) {
+    lcd.print("I = ");
+    lcd.print(Iamp, 3);
+    lcd.print(" A   ");
+  } else {
+    lcd.print("I = ");
+    lcd.print(Iamp * 1000.0, 1);
+    lcd.print(" mA  ");
+  }
+
+  delay(400);
+  lcd.clear();
+}
+
+/* ------------------------------------------------------------------ */
+/*  OHMMETER                                                           */
+/* ------------------------------------------------------------------ */
+void runOhmmeter() {
+  float avgADC = readAverageADC(OHM, 500);
+  float Vr     = avgADC * (5.0 / 1023.0);
+
+  // Avoid divide-by-zero if leads are open (Vr ~ 5 V)
+  float r = 0.0;
+  if (Vr < 4.98) {
+    r = (OHM_REF * Vr) / (5.0 - Vr);
+  } else {
+    r = 999.99; // Over-range
+  }
+  if (r < 0.0) r = 0.0;
+
+  lcd.setCursor(0, 0);
+  lcd.print("Ohmmeter        ");
+  lcd.setCursor(0, 1);
+
+  if (r >= 1.0) {
+    lcd.print("R = ");
+    lcd.print(r, 2);
+    lcd.print(" Kohm ");
+  } else {
+    lcd.print("R = ");
+    lcd.print(r * 1000.0, 1);
+    lcd.print(" ohm  ");
+  }
+
+  delay(400);
+  lcd.clear();
+}
+
+/* ------------------------------------------------------------------ */
+/*  WATTMETER                                                          */
+/* ------------------------------------------------------------------ */
+void runWattmeter() {
+  // We need both voltage and current.
+  // Re-sample each rather than re-using stale globals.
+  float vADC = readAverageADC(VOLT_IN, 300);
+  float volt = vADC * (5.0 / 1023.0) * VOLT_SCALE - VOLT_OFFSET;
+  if (volt < 0.0) volt = 0.0;
+
+  float cADC = readAverageADC(CURRENT_IN, 300);
+  float Iamp = (cADC * (5.0 / 1023.0)) / SHUNT_OHM;
+  if (Iamp < 0.0) Iamp = 0.0;
+
+  float power = volt * Iamp;
+
+  lcd.setCursor(0, 0);
+  lcd.print("Wattmeter       ");
+  lcd.setCursor(0, 1);
+
+  if (power >= 1.0) {
+    lcd.print("P = ");
+    lcd.print(power, 3);
+    lcd.print(" W   ");
+  } else {
+    lcd.print("P = ");
+    lcd.print(power * 1000.0, 1);
+    lcd.print(" mW  ");
+  }
+
+  delay(400);
+  lcd.clear();
 }
