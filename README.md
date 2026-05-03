@@ -28,6 +28,10 @@ A comprehensive digital multimeter built using Arduino Uno that measures voltage
 
 <img src="Schematic.png" alt="Schematic of the circuit" width="700">
 
+## Documentation
+
+You can access the documentation [**here**](Measurement%20Documentation.pdf)
+
 ## Team Members
 
 1. Amaar Ayman Mostafa
