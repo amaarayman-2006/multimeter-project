@@ -24,6 +24,10 @@ A comprehensive digital multimeter built using Arduino Uno that measures voltage
 | Breadboard + wires | Standard 830-tie breadboard | 1 |
 | Power supply | USB (5V) or 7–12V DC barrel jack | 1 |
 
+## Circuit Schematic
+
+<img src="Schematic.png" alt="Schematic of the circuit" width="700">
+
 ## Team Members
 
 1. Amaar Ayman Mostafa
