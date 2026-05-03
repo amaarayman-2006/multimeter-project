@@ -4,14 +4,14 @@
 
 A comprehensive digital multimeter built using Arduino Uno that measures voltage, current and resistance. This project is a part of "Electric and Electronic Measurements" course at Electric Engineering Dept., Faculty of Engineering, Alexandria University.
 
-## 📋 Features
+## Features
 
 - **Voltage Measurement (DC)**: 0-100V with 0.01V resolution
 - **Current Measurement**: 0-220mA
 - **Resistance Measurement**: 10Ω-1MΩ with auto-ranging
 - **16x2 LCD Display**: Real-time readings with backlight
 
-## 🛠️ Components Required
+## Bill Of Components
 
 | Component | Specification / Part Number | Quantity |
 |-----------|----------------------------|----------|
@@ -24,4 +24,7 @@ A comprehensive digital multimeter built using Arduino Uno that measures voltage
 | Breadboard + wires | Standard 830-tie breadboard | 1 |
 | Power supply | USB (5V) or 7–12V DC barrel jack | 1 |
 
-See the images for better understanding of the project.
+## Team Members
+
+1. Amaar Ayman Mostafa
+2. Ahmed Mohamed Othman
